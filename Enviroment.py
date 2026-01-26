@@ -43,10 +43,12 @@ class Dealer:
             card = self.ordered_deck[np.random.randint(0,52)]
             return card
         
-        else:
+        elif len(self.playing_deck) > 0:
             card = self.playing_deck.pop()
             self.playing_deck_length = len(self.playing_deck)
             return card
+        else:
+            return None
 
 
 
@@ -57,17 +59,29 @@ class BlackjackEnv:
         self.player_hand = []
 
     def card_value(self,card):
+        if card is None:
+            return 0
         value = card[1]
         if value > 10:
             value = 10
+
+        if value == 1:
+            value = 11
         return value
     
     def stick_or_hit(self,hit):
         if hit:
             card = self.dealer.deal_card()
             self.player_hand.append(card)
-        
+    
         self.player_hand_value = np.sum(self.card_value(card) for card in self.player_hand)
+        if self.player_hand_value > 21:
+            # check for aces and convert them from 11 to 1
+            for i in range(len(self.player_hand)):
+                if self.player_hand[i][1] == 1:
+                    self.player_hand_value -= 10
+                    if self.player_hand_value <= 21:
+                        break
         
     def reset_hand(self):
         self.player_hand = []
