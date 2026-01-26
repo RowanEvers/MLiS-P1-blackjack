@@ -1,4 +1,5 @@
 import numpy as np
+
 class Dealer:
     def __init__(self):
         self.ordered_deck = []
@@ -71,3 +72,6 @@ class BlackjackEnv:
     def reset_hand(self):
         self.player_hand = []
         self.player_hand_value = 0
+
+    def reset_deck(self,D=np.inf):
+        self.playing_deck = self.dealer.create_playing_deck(D)
