@@ -71,6 +71,3 @@ class BlackjackEnv:
     def reset_hand(self):
         self.player_hand = []
         self.player_hand_value = 0
-
-
-#hello
