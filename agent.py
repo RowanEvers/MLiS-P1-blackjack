@@ -3,7 +3,7 @@ import random
 import numpy as np
 
 class QLearningAgent:
-    def __init__(self, env, alpha=0.1,gamma=0.9,epsilon=0.1):
+    def __init__(self, env, alpha=0.1,gamma=0.9,epsilon_end=0.01):
         self.env = env
         self.policy = [] 
         self.state = 0 # initial state
@@ -13,7 +13,9 @@ class QLearningAgent:
             self.Q_values[(state, 'stick')] = 0.0
         self.alpha = alpha  # learning rate
         self.gamma = gamma  # discount factor
-        self.epsilon = 0.1 # explortation rate 
+        self.epsilon_start = 1 # explortation rate 
+        self.epsilon_end = epsilon_end
+        self.epsilon = self.epsilon_start
 
     def Q(self,state,action):
         # returns the Q value from the Q table given a state and action, if not present returns 0
@@ -112,11 +114,12 @@ class QLearningAgent:
         # runs multiple episodes to learn Q-values
         per_episode_rewards = []
         for episode in range(num_episodes):
+            self.epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * np.exp(-1 * episode / (num_episodes / 10)) # decay epsilon 
             episode_reward = self.run_episode_reward()
             per_episode_rewards.append(episode_reward)
-            print(f'Episode {episode+1} completed. Average reward: {np.mean(per_episode_rewards)}')
+            print(f'Episode {episode+1} completed. Moving Average Reward: {np.mean(per_episode_rewards[-100:])}')
         
-        return np.mean(per_episode_rewards)
+        return per_episode_rewards
         
 
     
