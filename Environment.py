@@ -55,6 +55,7 @@ class Dealer:
 class BlackjackEnv:
     def __init__(self, D=np.inf):
         self.dealer = Dealer()
+        self.D = D
         self.playing_deck = self.dealer.create_playing_deck(D)
         self.player_hand = []
 
@@ -87,5 +88,5 @@ class BlackjackEnv:
         self.player_hand = []
         self.player_hand_value = 0
 
-    def reset_deck(self,D=np.inf):
-        self.playing_deck = self.dealer.create_playing_deck(D)
+    def reset_deck(self):
+        self.playing_deck = self.dealer.create_playing_deck(self.D)
