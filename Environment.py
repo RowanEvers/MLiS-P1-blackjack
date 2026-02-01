@@ -1,5 +1,5 @@
 import numpy as np
-
+import random
 class Dealer:
     def __init__(self):
         self.ordered_deck = []
@@ -24,9 +24,8 @@ class Dealer:
     def create_playing_deck(self,D):
         # shuffles D decks together 
         if D != np.inf:
-            self.playing_deck = self.ordered_deck.copy()
-            for i in range(D-1):
-                self.playing_deck += self.ordered_deck
+        
+            self.playing_deck = self.ordered_deck * D
 
             np.random.shuffle(self.playing_deck)
             self.playing_deck_length = len(self.playing_deck)
@@ -40,12 +39,12 @@ class Dealer:
 
     def deal_card(self):
         if self.playing_deck == 'infinite deck':
-            card = self.ordered_deck[np.random.randint(0,52)]
+            card = random.choice(self.ordered_deck)
             return card
         
         elif len(self.playing_deck) > 0:
             card = self.playing_deck.pop()
-            self.playing_deck_length = len(self.playing_deck)
+            self.playing_deck_length -= 1 
             return card
         else:
             return None

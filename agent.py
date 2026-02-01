@@ -3,19 +3,21 @@ import random
 import numpy as np
 
 class QLearningAgent:
-    def __init__(self, env, alpha=0.1,gamma=0.9,epsilon_end=0.01):
+    def __init__(self, env, alpha=0.1,gamma=0.9):
         self.env = env
+        assert env.dealer.playing_deck_length == np.inf, 'Deck must be infinite for Q-learning agent.'
         self.state = 0 # initial state
         self.Q_values = {}
         for state in range(2, 22):
-            self.Q_values[(state, 'hit')] = 0.0
-            self.Q_values[(state, 'stick')] = 0.0
+            self.Q_values[(state, 'hit')] = 500
+            self.Q_values[(state, 'stick')] = 500
 
         self.alpha = alpha  # learning rate
         self.gamma = gamma  # discount factor
         self.epsilon_start = 1 # explortation rate 
-        self.epsilon_end = epsilon_end
+        self.epsilon_end = 0.01
         self.epsilon = self.epsilon_start
+        
 
     def Q(self,state,action):
         # returns the Q value from the Q table given a state and action, if not present returns 0
@@ -117,7 +119,7 @@ class QLearningAgent:
             self.epsilon = epsilon
         for episode in range(num_episodes):
             if decay_epsilon:
-                self.epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * np.exp(-1*episode / (num_episodes / 10)) # decay epsilon 
+                self.epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * np.exp(-1*episode / (num_episodes / 8)) # decay epsilon 
             episode_reward = self.run_episode_reward()
             per_episode_rewards.append(episode_reward)
 
@@ -138,10 +140,11 @@ class ReinforceAgent:
         self.env = env 
         self.weights = np.linspace(0.01, 0.01, 15) # weights for each state feature, including bias
         self.state = np.zeros(15)
-
+        self.training_steps = 0
         # vectors for ADAM optimizer
         self.m = np.zeros(15)
         self.v = np.zeros(15)
+
 
     def sigmoid(self,x):
         x = np.clip(x, -20, 20) # to prevent overflow
@@ -226,18 +229,25 @@ class ReinforceAgent:
         return episodic_trajectory
     
         
-    def train_agent(self,num_episodes, learning_rate=0.001, gamma = 1,ADAM=False):
+    
+    def train_agent_vectorised(self,num_episodes, learning_rate=0.001, gamma = 1,ADAM=False):
         
         episode_rewards_avg_per_hand = []
 
         for episode in range(num_episodes):
             number_of_hands = 0
             episode_trajectory = self.run_episode()
+            states, actions, rewards, terminals = zip(*episode_trajectory)
+            state_array = np.array(states)  
+            action_array = np.array(actions)
             hand_rewards = [item[-2] for item in episode_trajectory]
+
             episode_reward = sum(hand_rewards)
             Gt_list = []
+            Gt_array = np.zeros(len(episode_trajectory))
             G = 0 
-
+            
+            
             for i, r in reversed(list(enumerate(hand_rewards))):
                 
                 if episode_trajectory[i][-1]:  # if terminal state
@@ -245,58 +255,51 @@ class ReinforceAgent:
                     G = 0
 
                 G = r + gamma * G
-                Gt_list.insert(0, G) # calculate return from time t
+                Gt_array[i] = G # calculate return from time t
 
 
-            assert len(Gt_list) == len(episode_trajectory) # ensure Gt_list is the correct length 
+            assert len(Gt_array) == len(episode_trajectory) # ensure Gt_list is the correct length 
 
-            Gt_array = np.array(Gt_list)
+            #Gt_array = np.array(Gt_list)
             # standardise returns for variance reduction
             Gt_array = (Gt_array - np.mean(Gt_array)) / (np.std(Gt_array) + 1e-8)
 
             # update weights using policy gradient
-            for t in range(len(episode_trajectory)):
-                state = episode_trajectory[t][0]
-                action = episode_trajectory[t][1]
-                Gt = Gt_array[t]
+            # create vectors (arrays) for hit actions and probabilities
 
-                # get the probability of a hit under the current policy 
-                prob_hit = self.parameterised_policy(state)
+            h= np.zeros(len(episode_trajectory))
+            h[action_array == 'hit'] = 1
+            prob_hit_array = self.parameterised_policy(state_array.T)  
+            grad_log_policy_array = (h - prob_hit_array)[:, np.newaxis] * state_array  # shape (num_steps, num_features)
 
-                h = 1 if action == 'hit' else 0
+            if not ADAM:
+                for t in range(len(episode_trajectory)):
+                    self.weights += learning_rate * gamma**t * Gt_array[t] * grad_log_policy_array[t]
+            elif ADAM:
+                # Adam parameters
+                beta1 = 0.9
+                beta2 = 0.999
+                epsilon = 1e-8
 
-                #calculate gradient of log policy
-                ''' 
-                For a Sigmoid policy, the gradient of log-probability is:
-                 (Action_Taken - Prob_Hit) * State 
-                 '''
-                grad_log_policy = (h - prob_hit) * state
-
-                # update weights
-                if not ADAM:
-                    self.weights += learning_rate * gamma**t * Gt * grad_log_policy
-
-                # ADAM update 
-                elif ADAM:
-                    # Adam parameters
-                    beta1 = 0.9
-                    beta2 = 0.999
-                    epsilon = 1e-8
-
-                    gt = gamma**t * Gt * grad_log_policy
+                for t in range(len(episode_trajectory)):
+                    self.training_steps += 1
+                    gt = gamma**t * Gt_array[t] * grad_log_policy_array[t]
 
                     self.m = beta1 * self.m + (1 - beta1) * gt
                     self.v = beta2 * self.v + (1 - beta2) * (gt ** 2)
-                    m_hat = self.m / (1 - beta1 ** (t + 1))
-                    v_hat = self.v / (1 - beta2 ** (t + 1))
+
+                    m_hat = self.m / (1 - beta1 ** (self.training_steps))
+                    v_hat = self.v / (1 - beta2 ** (self.training_steps))
+
                     self.weights += learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
-                    
 
 
             episode_reward_avg_per_hand = episode_reward / number_of_hands
             episode_rewards_avg_per_hand.append(episode_reward_avg_per_hand)
-            if (episode+1) % 100 == 0:
-                print(f'Episode {episode+1} completed ({(episode+1)/num_episodes*100:.2f}%). Average reward per hand: {episode_reward_avg_per_hand}')
-        return episode_rewards_avg_per_hand
+            #if (episode+1) % 100 == 0:
+            #    print(f'Episode {episode+1} completed ({(episode+1)/num_episodes*100:.2f}%). Average reward per hand: {episode_reward_avg_per_hand}')
+
+
 
         
+        return episode_rewards_avg_per_hand   
