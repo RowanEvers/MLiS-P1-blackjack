@@ -15,7 +15,7 @@ class QLearningAgent:
         self.alpha = alpha  # learning rate
         self.gamma = gamma  # discount factor
         self.epsilon_start = 1 # explortation rate 
-        self.epsilon_end = 0.01
+        self.epsilon_end = 0.001
         self.epsilon = self.epsilon_start
         
 
@@ -119,7 +119,7 @@ class QLearningAgent:
             self.epsilon = epsilon
         for episode in range(num_episodes):
             if decay_epsilon:
-                self.epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * np.exp(-1*episode / (num_episodes / 8)) # decay epsilon 
+                self.epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * np.exp(-1*episode / (num_episodes / 10)) # decay epsilon 
             episode_reward = self.run_episode_reward()
             per_episode_rewards.append(episode_reward)
 
